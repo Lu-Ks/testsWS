@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Socket.IO chat</title>
+        <style>
+            body {
+                margin: 0;
+                padding-bottom: 3rem;
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI",
+                    Roboto, Helvetica, Arial, sans-serif;
+            }
+
+            #form {
+                background: rgba(0, 0, 0, 0.15);
+                padding: 0.25rem;
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                display: flex;
+                height: 3rem;
+                box-sizing: border-box;
+                backdrop-filter: blur(10px);
+            }
+
+            #name,
+            #message {
+                border: none;
+                padding: 0 1rem;
+                border-radius: 2rem;
+                margin: 0.25rem;
+            }
+
+            #name {
+                width: 10%;
+            }
+
+            #message {
+                flex: 1;
+            }
+
+            #name:focus,
+            #message:focus {
+                outline: none;
+            }
+
+            #form > button {
+                background: #333;
+                border: none;
+                padding: 0 1rem;
+                margin: 0.25rem;
+                border-radius: 3px;
+                outline: none;
+                color: #fff;
+            }
+
+            #messages {
+                list-style-type: none;
+                margin: 0;
+                padding: 0;
+            }
+
+            #messages > li {
+                padding: 0.5rem 1rem;
+            }
+
+            #messages > li:nth-child(odd) {
+                background: #efefef;
+            }
+
+            #nbUsersContainer {
+                min-width: 40px;
+                display: flex;
+                align-items: center;
+                justify-content: space-around
+            }
+            
+            #nbUsersContainer svg {
+                height: 20px;
+            }
+
+            #nbUsers {
+                font-size: 20px;
+            }
+        </style>
+    </head>
+    <body>
+        <ul id="messages"></ul>
+        <form id="form" action="">
+            <input id="name" autocomplete="off" />
+            <input id="message" autocomplete="off" />
+            <button>Send</button>
+            <span id="nbUsersContainer">
+                <span id="nbUsers">10</span>
+                <svg id="a" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 595.62 561.5"><defs><style>.b{fill:#1d1d1b;stroke:#1d1d1b;stroke-miterlimit:10;}</style></defs><circle class="b" cx="297.81" cy="173.12" r="172.62"/><path class="b" d="M595.12,561.5c0-95.33-133.11-172.62-297.31-172.62S.5,466.17,.5,561.5"/></svg>
+            </span>
+        </form>
+        <script src="/socket.io/socket.io.js"></script>
+        <script>
+            const socket = io();
+
+            const messages = document.getElementById("messages");
+            const form = document.getElementById("form");
+            const message = document.getElementById("message");
+            const name = document.getElementById("name");
+            const nbUsers = document.getElementById("nbUsers");
+            let users = {};
+
+            form.addEventListener("submit", function (e) {
+                e.preventDefault();
+                if (message.value) {
+                    socket.emit("message", message.value);
+                    newMessage(`${name.value}: ${message.value}`);
+                    message.value = "";
+                }
+            });
+
+            name.addEventListener("change", (e) => {
+                console.log("name:", e.target.value);
+                socket.emit('rename', e.target.value);
+            })
+
+            socket.on("message", function (message, user) {
+                newMessage(`${user.name}: ${message}`);
+            });
+
+            const newMessage = (message) => {
+                const item = document.createElement("li");
+                item.textContent = message;
+                messages.appendChild(item);
+                window.scrollTo(0, document.body.scrollHeight);
+            }
+
+            const updateNbUsers = () => {
+                nbUsers.innerHTML = Object.entries(users).length;
+            };
+
+            socket.on("randomName", (randomName) => {
+                name.value = randomName;
+            })
+
+            socket.on("users", (allUsers) => {
+                console.log('users', users);
+                users = allUsers;
+                updateNbUsers();
+            })
+
+            socket.on("user_disconnect", (user) => {
+                console.log('disc', user);
+                newMessage(`${user.name} left the chat`);
+                delete users[user.id];
+                updateNbUsers();
+            })
+
+            socket.on("user_connect", (user) => {
+                newMessage(`${user.name} join the chat`);
+                users[user.id] = { name: user.name };
+                updateNbUsers();
+            })
+
+            socket.on("rename", (user) => {
+                console.log(`${users[user.id].name} renamed to ${user.name}`);
+                newMessage(`${users[user.id].name} renamed to ${user.name}`)
+                users[user.id].name = user.name;
+            })
+
+        </script>
+    </body>
+</html>
